@@ -1,75 +1,72 @@
-#include <eadk.h>
-#include <stdlib.h>
+#include "eadk.h"
 #include <string.h>
-#include <stdio.h>
 
-const char eadk_app_name[] __attribute__((section(".rodata.eadk_app_name"))) = "App";
+#define WIDTH 160
+#define HEIGHT 120
+
+#define PIXEL_SIZE 2
+
+
+const char eadk_app_name[] __attribute__((section(".rodata.eadk_app_name"))) = "Game Of Life";
 const uint32_t eadk_api_level  __attribute__((section(".rodata.eadk_api_level"))) = 0;
 
-eadk_color_t random_color() {
-  return (eadk_color_t)eadk_random();
-}
-
-eadk_rect_t random_screen_rect() {
-  uint16_t x = eadk_random() % (EADK_SCREEN_WIDTH - 1);
-  uint16_t y = eadk_random() % (EADK_SCREEN_HEIGHT - 1);
-  uint16_t width = eadk_random() % (EADK_SCREEN_WIDTH - x);
-  uint16_t height = eadk_random() % (EADK_SCREEN_HEIGHT - y);
-  return (eadk_rect_t){x, y, width, height};
-}
-
-void draw_random_colorful_rectangles() {
-  eadk_display_push_rect_uniform(eadk_screen_rect, eadk_color_black);
-  for (int i=0; i<100; i++) {
-    eadk_display_push_rect_uniform(random_screen_rect(), random_color());
-  }
-}
-
-void draw_random_buffer() {
-  eadk_rect_t rect = {0, 0, 30, 30};
-  size_t bufferSize = rect.width*rect.height*sizeof(eadk_color_t);
-  eadk_color_t * pixels = (eadk_color_t *)malloc(bufferSize);
-  if (pixels == NULL) {
-    return;
-  }
-  memset(pixels, 0, bufferSize);
-  for (int i=0; i<rect.width*rect.height; i++) {
-    pixels[i] = random_color();
-  }
-  eadk_display_push_rect(rect, pixels);
-  free(pixels);
-}
-
-void move_pointer() {
-  uint16_t size = 10;
-  eadk_rect_t cursor = {(EADK_SCREEN_WIDTH-size)/2, (EADK_SCREEN_HEIGHT-size)/2, size, size};
-  while (true) {
-    eadk_keyboard_state_t keyboard = eadk_keyboard_scan();
-    if (eadk_keyboard_key_down(keyboard, eadk_key_back)) {
-      return;
-    }
-    if (eadk_keyboard_key_down(keyboard, eadk_key_left) && cursor.x > 0) {
-      cursor.x -= 1;
-    }
-    if (eadk_keyboard_key_down(keyboard, eadk_key_up) && cursor.y > 0) {
-      cursor.y -= 1;
-    }
-    if (eadk_keyboard_key_down(keyboard, eadk_key_right) && cursor.x < EADK_SCREEN_WIDTH-size ) {
-      cursor.x += 1;
-    }
-    if (eadk_keyboard_key_down(keyboard, eadk_key_down) && cursor.y < EADK_SCREEN_HEIGHT-size) {
-      cursor.y += 1;
-    }
-    eadk_display_push_rect_uniform(cursor, random_color());
-    eadk_timing_msleep(20);
-  }
-}
+bool front[WIDTH*HEIGHT];
+bool back[WIDTH*HEIGHT];
 
 int main(int argc, char * argv[]) {
-  printf("External data : '%s'\n", eadk_external_data);
-  eadk_timing_msleep(3000);
-  draw_random_colorful_rectangles();
-  draw_random_buffer();
-  eadk_display_draw_string("Hello, world!", (eadk_point_t){0, 0}, true, eadk_color_black, eadk_color_white);
-  move_pointer();
+  for (int x = 0; x < WIDTH; x++) {
+      for (int y = 0; y < HEIGHT; y++) {
+        front[x+y*WIDTH] = false;
+        eadk_display_push_rect_uniform((eadk_rect_t){(uint16_t)(x*PIXEL_SIZE), (uint16_t)(y*PIXEL_SIZE), (uint16_t)(PIXEL_SIZE), (uint16_t)(PIXEL_SIZE)}, eadk_color_white);
+      }
+  }
+
+  for (int x = 0; x < WIDTH; x++) {
+      for (int y = 0; y < HEIGHT; y++) {
+        if (eadk_random() > 1<<31) {
+          front[x+y*WIDTH] = true;
+          eadk_display_push_rect_uniform((eadk_rect_t){(uint16_t)(x*PIXEL_SIZE), (uint16_t)(y*PIXEL_SIZE), (uint16_t)(PIXEL_SIZE), (uint16_t)(PIXEL_SIZE)}, eadk_color_black);
+        }
+      }
+  }
+
+  eadk_display_push_rect_uniform(eadk_screen_rect, eadk_color_white);
+  
+  while (true) {
+    memcpy(back, front, WIDTH*HEIGHT);
+
+    for (int x = 0; x < WIDTH; x++) {
+      for (int y = 0; y < HEIGHT; y++) {
+        int count = 0;
+
+        for (int v = 0; v < 3; v++) {
+          for (int w = 0; w < 3; w++) {
+            int xx = (x+v-1) % WIDTH;
+            int yy = (y+w-1) % HEIGHT;
+
+            if (xx==x && yy==y) continue;
+            
+            if (back[xx+yy*WIDTH]) count++;
+          }
+        }
+
+        if ((count < 2) || (count > 3)) {
+          front[x+y*WIDTH] = false;
+          eadk_display_push_rect_uniform((eadk_rect_t){(uint16_t)(x*PIXEL_SIZE), (uint16_t)(y*PIXEL_SIZE), (uint16_t)(PIXEL_SIZE), (uint16_t)(PIXEL_SIZE)}, eadk_color_white);
+        } else if (count == 3) {
+          front[x+y*WIDTH] = true;
+          eadk_display_push_rect_uniform((eadk_rect_t){(uint16_t)(x*PIXEL_SIZE), (uint16_t)(y*PIXEL_SIZE), (uint16_t)(PIXEL_SIZE), (uint16_t)(PIXEL_SIZE)}, eadk_color_black);
+        }
+      }
+    }
+
+    eadk_keyboard_state_t keyboardState = eadk_keyboard_scan();
+
+    if (eadk_keyboard_key_down(keyboardState, eadk_key_home)) {
+      return 0;
+    }
+
+    eadk_timing_msleep(20);
+  }
+  return 0;
 }
