@@ -1,22 +1,33 @@
 #include "eadk.h"
 #include <string.h>
+#include <limits.h>
 
 #define WIDTH 160
 #define HEIGHT 120
 
 #define PIXEL_SIZE 2
 
+#define BITMASK(b) (1 << ((b) % CHAR_BIT))
+#define BITSLOT(b) ((b) / CHAR_BIT)
+#define BITSET(a, b) ((a)[BITSLOT(b)] |= BITMASK(b))
+#define BITCLEAR(a, b) ((a)[BITSLOT(b)] &= ~BITMASK(b))
+#define BITTEST(a, b) ((a)[BITSLOT(b)] & BITMASK(b))
+#define BITNSLOTS(nb) ((nb + CHAR_BIT - 1) / CHAR_BIT)
+
+#define BYTES_NEEDED BITNSLOTS(WIDTH*HEIGHT)
+
 
 const char eadk_app_name[] __attribute__((section(".rodata.eadk_app_name"))) = "Game Of Life";
 const uint32_t eadk_api_level  __attribute__((section(".rodata.eadk_api_level"))) = 0;
 
-bool front[WIDTH*HEIGHT];
-bool back[WIDTH*HEIGHT];
+char front[BYTES_NEEDED];
+char back[BYTES_NEEDED];
+
 
 int main(int argc, char * argv[]) {
   for (int x = 0; x < WIDTH; x++) {
       for (int y = 0; y < HEIGHT; y++) {
-        front[x+y*WIDTH] = false;
+        BITCLEAR(front, x+y*WIDTH);
         eadk_display_push_rect_uniform((eadk_rect_t){(uint16_t)(x*PIXEL_SIZE), (uint16_t)(y*PIXEL_SIZE), (uint16_t)(PIXEL_SIZE), (uint16_t)(PIXEL_SIZE)}, eadk_color_white);
       }
   }
@@ -24,7 +35,7 @@ int main(int argc, char * argv[]) {
   for (int x = 0; x < WIDTH; x++) {
       for (int y = 0; y < HEIGHT; y++) {
         if (eadk_random() > 1<<31) {
-          front[x+y*WIDTH] = true;
+          BITSET(front, x+y*WIDTH);
           eadk_display_push_rect_uniform((eadk_rect_t){(uint16_t)(x*PIXEL_SIZE), (uint16_t)(y*PIXEL_SIZE), (uint16_t)(PIXEL_SIZE), (uint16_t)(PIXEL_SIZE)}, eadk_color_black);
         }
       }
@@ -33,7 +44,7 @@ int main(int argc, char * argv[]) {
   eadk_display_push_rect_uniform(eadk_screen_rect, eadk_color_white);
   
   while (true) {
-    memcpy(back, front, WIDTH*HEIGHT);
+    memcpy(back, front, BYTES_NEEDED);
 
     for (int x = 0; x < WIDTH; x++) {
       for (int y = 0; y < HEIGHT; y++) {
@@ -46,15 +57,15 @@ int main(int argc, char * argv[]) {
 
             if (xx==x && yy==y) continue;
             
-            if (back[xx+yy*WIDTH]) count++;
+            if (BITTEST(back, xx+yy*WIDTH)) count++;
           }
         }
 
         if ((count < 2) || (count > 3)) {
-          front[x+y*WIDTH] = false;
+          BITCLEAR(front, x+y*WIDTH);
           eadk_display_push_rect_uniform((eadk_rect_t){(uint16_t)(x*PIXEL_SIZE), (uint16_t)(y*PIXEL_SIZE), (uint16_t)(PIXEL_SIZE), (uint16_t)(PIXEL_SIZE)}, eadk_color_white);
         } else if (count == 3) {
-          front[x+y*WIDTH] = true;
+          BITSET(front, x+y*WIDTH);
           eadk_display_push_rect_uniform((eadk_rect_t){(uint16_t)(x*PIXEL_SIZE), (uint16_t)(y*PIXEL_SIZE), (uint16_t)(PIXEL_SIZE), (uint16_t)(PIXEL_SIZE)}, eadk_color_black);
         }
       }
