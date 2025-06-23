@@ -4,7 +4,7 @@
 
 This is a sample C app to use on a [NumWorks calculator](https://www.numworks.com).
 
-```c
+```c 
 #include <eadk.h>
 
 int main(int argc, char * argv[]) {
