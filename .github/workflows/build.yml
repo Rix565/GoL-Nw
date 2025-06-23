@@ -13,3 +13,7 @@ jobs:
         run: make build
       - name: Run make check
         run: make check
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          path: output/app.nwa
